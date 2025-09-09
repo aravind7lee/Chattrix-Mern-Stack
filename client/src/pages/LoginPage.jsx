@@ -203,13 +203,49 @@ const LoginPage = () => {
   const step2InClass = isDesktop ? "translate-x-0 opacity-100 pointer-events-auto" : "translate-y-0 opacity-100 pointer-events-auto";
   const step2OutClass = isDesktop ? "translate-x-6 opacity-0 pointer-events-none" : "translate-y-4 opacity-0 pointer-events-none";
 
+  /**
+   * IMPORTANT: global style adjustments to avoid white gaps / overflow on mobile.
+   * We set document/body margins and overflow-x here and restore on cleanup.
+   */
+  useEffect(() => {
+    const docEl = document.documentElement;
+    const body = document.body;
+    const prevOverflowX = docEl.style.overflowX;
+    const prevBodyMargin = body.style.margin;
+    const prevBodyBg = body.style.background;
+
+    // Prevent horizontal overflow (prevents right-edge white bar)
+    docEl.style.overflowX = "hidden";
+
+    // Remove default margin (browsers often add 8px) so layout touches edges
+    body.style.margin = "0";
+
+    // Ensure the page background is dark so you won't see white stripes in the viewport
+    body.style.background = "radial-gradient(circle at 30% 10%, rgba(124,58,237,0.06), rgba(79,70,229,0.03) 30%, #0b0b0f 100%)";
+
+    return () => {
+      docEl.style.overflowX = prevOverflowX;
+      body.style.margin = prevBodyMargin;
+      body.style.background = prevBodyBg;
+    };
+  }, []);
+
   return (
-    <div className="min-h-screen bg-cover bg-center flex items-center justify-center gap-8 sm:justify-evenly max-sm:flex-col backdrop-blur-2xl">
-      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center px-4 py-8">
+    <div
+      className="app-root min-h-screen w-screen flex flex-col sm:flex-row items-center justify-center gap-8 sm:justify-evenly overflow-hidden"
+      // respect safe-area insets for mobile notches
+      style={{
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+        paddingLeft: "env(safe-area-inset-left)",
+        paddingRight: "env(safe-area-inset-right)",
+      }}
+    >
+      <div className="w-full max-w-[980px] grid grid-cols-1 lg:grid-cols-12 gap-8 items-center px-4 py-8">
         {/* Left: Branding / info */}
         <aside className="col-span-12 lg:col-span-6 flex flex-col items-center lg:items-start text-center lg:text-left gap-4 sm:gap-6 px-2">
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 ">
+            <div className="w-12 h-12 sm:w-16 sm:h-16">
               <img src={assets.logo_icon || assets.logo_big} alt="logo" className="w-full h-full object-contain" />
             </div>
             <div>
@@ -217,7 +253,6 @@ const LoginPage = () => {
               <p className="text-sm text-white/70 mt-0.5">A modern chat experience — fast, private & beautiful.</p>
             </div>
           </div>
-
         </aside>
 
         {/* Right: Auth form */}
@@ -228,6 +263,8 @@ const LoginPage = () => {
             method="post"
             aria-label={isSignup ? "Sign up form" : "Login form"}
             className="relative w-full max-w-md p-4 sm:p-6 md:p-8 rounded-2xl bg-[linear-gradient(135deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] border border-white/10 backdrop-blur-xl shadow-2xl"
+            // ensure box sizing includes padding within width on small screens
+            style={{ boxSizing: "border-box" }}
           >
             {/* Header */}
             <div className="flex items-center justify-between mb-3">
@@ -465,9 +502,12 @@ const LoginPage = () => {
         }
         .animate-scale-up { animation: scaleUp 420ms cubic-bezier(.2,.9,.2,1) both; }
 
-        /* utility to tune the measured wrapper transitions on mobile vs desktop */
+        /* Ensure consistent box-sizing and prevent horizontal overflow */
+        html, body, #root { height: 100%; margin: 0; }
+        * { box-sizing: border-box; }
+
+        /* mobile: prefer slightly smaller form padding to fit narrow screens */
         @media (max-width: 767px) {
-          /* mobile: prefer smaller padding */
           form { padding: 14px; }
         }
       `}</style>
