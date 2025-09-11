@@ -1,3 +1,4 @@
+// RightSidebar.jsx
 import React, { useContext, useMemo, useState } from "react";
 import assets from "../assets/assets";
 import { ChatContext } from "../../context/ChatContext";
@@ -73,6 +74,7 @@ const RightSidebar = () => {
           bg-[#0b0b10]/60 backdrop-blur-md
           border-t border-white/10 md:border-t-0 md:border-l md:border-white/10
           text-white p-4 md:p-6 rounded-t-xl md:rounded-none
+          flex-none min-h-0
         "
         aria-label="Right sidebar with profile & media"
       >

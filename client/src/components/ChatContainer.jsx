@@ -86,12 +86,13 @@ const ChatContainer = () => {
   }
 
   return (
+    // Make the chat container a flex column so header / messages / composer size correctly
     <div
-      className="h-full overflow-hidden relative bg-gradient-to-br from-[rgba(255,255,255,0.12)] to-[rgba(255,255,255,0.03)] backdrop-blur-lg border-l border-[rgba(255,255,255,0.06)] rounded-r-2xl"
+      className="flex flex-col h-full min-h-0 overflow-hidden relative bg-gradient-to-br from-[rgba(255,255,255,0.12)] to-[rgba(255,255,255,0.03)] backdrop-blur-lg border-l border-[rgba(255,255,255,0.06)] rounded-r-2xl"
       aria-live="polite"
     >
       {/* HEADER */}
-      <header className="flex items-center gap-4 p-4 border-b border-[rgba(255,255,255,0.06)] bg-gradient-to-r from-[rgba(255,255,255,0.03)] to-transparent sticky top-0 z-30">
+      <header className="flex items-center gap-4 p-4 border-b border-[rgba(255,255,255,0.06)] bg-gradient-to-r from-[rgba(255,255,255,0.03)] to-transparent z-10">
         <div className="relative">
           {isLoading ? (
             <div className="w-12 h-12 rounded-full bg-[rgba(255,255,255,0.04)] animate-pulse" />
@@ -166,7 +167,8 @@ const ChatContainer = () => {
       </header>
 
       {/* MESSAGES */}
-      <main className="h-[calc(100%-140px)] overflow-y-auto p-4 md:p-6 space-y-4 custom-scrollbar">
+      {/* MAIN is flex-1 so it grows/shrinks correctly inside parent flex container */}
+      <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 custom-scrollbar min-h-0">
         {isLoading ? (
           // skeletons
           <div className="space-y-6">
@@ -174,7 +176,11 @@ const ChatContainer = () => {
               const isRight = i % 2 === 0;
               return (
                 <div key={i} className={`flex items-end gap-3 ${isRight ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[70%] p-4 rounded-2xl bg-[rgba(255,255,255,0.03)] animate-pulse ${isRight ? "rounded-br-md" : "rounded-bl-md"}`} />
+                  <div
+                    className={`max-w-[70%] p-4 rounded-2xl bg-[rgba(255,255,255,0.03)] animate-pulse ${
+                      isRight ? "rounded-br-md" : "rounded-bl-md"
+                    }`}
+                  />
                 </div>
               );
             })}
@@ -200,12 +206,13 @@ const ChatContainer = () => {
                 {msg.image ? (
                   <div
                     className={`rounded-2xl overflow-hidden mb-4 shadow-sm ${isOwn ? "ml-auto" : ""}`}
-                    style={{ maxWidth: 360 }}
+                    style={{ maxWidth: "90vw" }}
                   >
+                    {/* Responsive image: max width restricted to viewport, not a fixed px size */}
                     <img
                       src={msg.image}
                       alt={`shared-${index}`}
-                      className="w-[360px] h-full object-cover block"
+                      className="w-full h-auto object-cover block"
                       onClick={() => window.open(msg.image, "_blank")}
                     />
                   </div>
@@ -251,8 +258,8 @@ const ChatContainer = () => {
         <div ref={scrollEnd} />
       </main>
 
-      {/* COMPOSER */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[rgba(0,0,0,0.25)] to-transparent border-t border-[rgba(255,255,255,0.03)]">
+      {/* COMPOSER - now in normal flow (not absolute) so mobile stacking won't create weird gaps */}
+      <div className="flex-none p-4 bg-gradient-to-t from-[rgba(0,0,0,0.25)] to-transparent border-t border-[rgba(255,255,255,0.03)]">
         <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto flex items-center gap-3">
           <div className="flex-1 flex items-center gap-3 bg-[rgba(255,255,255,0.03)] px-3 py-2 rounded-full">
             <input
