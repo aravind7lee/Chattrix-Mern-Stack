@@ -1,4 +1,4 @@
-// AuthContext.jsx
+// context/AuthContext.jsx
 import { createContext, useEffect, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -36,7 +36,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
-   * Login (state = "login" | "register")
+   * Login (state = "signup" | "login")
    */
   const login = async (state, credentials) => {
     try {
@@ -44,9 +44,14 @@ export const AuthProvider = ({ children }) => {
       if (data?.success) {
         const user = data.userData ?? data.user;
         setAuthUser(user);
+
+        // set token into axios headers for further requests (two common header styles)
         axios.defaults.headers.common["token"] = data.token;
+        axios.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
+
         setToken(data.token);
         localStorage.setItem("token", data.token);
+
         connectSocket(user);
         toast.success(data.message || "Logged in");
         return data;
@@ -56,18 +61,13 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error("login error:", error);
-      toast.error(error?.message || "Login failed");
+      toast.error(error?.response?.data?.message || error?.message || "Login failed");
       throw error;
     }
   };
 
   /**
    * Logout - async, clears state, disconnects socket, and redirects
-   *
-   * Usage examples:
-   *   await logout();  // logs out + redirects to /login
-   *   await logout({ redirect: false }); // logs out without redirect
-   *   await logout({ redirectTo: "/welcome", showToast: true });
    */
   const logout = async ({ redirect = true, redirectTo = "/login", showToast = true } = {}) => {
     try {
@@ -84,10 +84,16 @@ export const AuthProvider = ({ children }) => {
       setAuthUser(null);
       setOnlineUsers([]);
 
+      // Remove axios headers safely
       try {
         delete axios.defaults.headers.common["token"];
       } catch {
         axios.defaults.headers.common["token"] = null;
+      }
+      try {
+        delete axios.defaults.headers.common["Authorization"];
+      } catch {
+        axios.defaults.headers.common["Authorization"] = null;
       }
 
       // Disconnect socket safely
@@ -106,7 +112,7 @@ export const AuthProvider = ({ children }) => {
         window.location.replace(redirectTo);
       }
 
-      return Promise.resolve(); // explicit promise resolution
+      return Promise.resolve();
     } catch (error) {
       console.error("logout error:", error);
       if (showToast) toast.error("Logout failed");
@@ -167,11 +173,17 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (token) {
       axios.defaults.headers.common["token"] = token;
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
     } else {
       try {
         delete axios.defaults.headers.common["token"];
       } catch {
         axios.defaults.headers.common["token"] = null;
+      }
+      try {
+        delete axios.defaults.headers.common["Authorization"];
+      } catch {
+        axios.defaults.headers.common["Authorization"] = null;
       }
     }
     checkAuth();

@@ -10,8 +10,12 @@ import assets from "../assets/assets";
 import { AuthContext } from "../../context/AuthContext";
 import toast from "react-hot-toast";
 
-/* Improved Email regex validation */
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/* Base email regex validation (keeps broad checks) */
+const EMAIL_RE = /^\S+@\S+\.\S+$/;
+
+/* Allowed domains: change this array if you want to accept other providers.
+   For your requirement, we enforce only gmail.com. */
+const ALLOWED_DOMAINS = ["gmail.com"]; // <-- change or add more domains here
 
 /* Password strength logic */
 function passwordStrength(password) {
@@ -65,6 +69,15 @@ const StrengthPips = ({ password }) => {
   );
 };
 
+/* Helper: check domain whitelist */
+function isDomainAllowed(email) {
+  if (!email || typeof email !== "string") return false;
+  const parts = email.split("@");
+  if (parts.length !== 2) return false;
+  const domain = parts[1].toLowerCase();
+  return ALLOWED_DOMAINS.includes(domain);
+}
+
 const LoginPage = () => {
   const { login } = useContext(AuthContext);
 
@@ -84,9 +97,8 @@ const LoginPage = () => {
   // Validation errors
   const [emailError, setEmailError] = useState("");
   const [fullNameError, setFullNameError] = useState("");
-
-  // Track if email field has been interacted with
   const [emailTouched, setEmailTouched] = useState(false);
+  const [fullNameTouched, setFullNameTouched] = useState(false);
 
   // Responsive check
   const [isDesktop, setIsDesktop] = useState(
@@ -103,26 +115,40 @@ const LoginPage = () => {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // Validate email when it changes and has been touched
+  // Real-time email validation (now enforces allowed domain)
   useEffect(() => {
     if (emailTouched) {
-      validateEmail();
+      if (!email) {
+        setEmailError("Please fill in this field");
+      } else if (!EMAIL_RE.test(email)) {
+        setEmailError("Enter a valid email address.");
+      } else if (!isDomainAllowed(email)) {
+        // friendly message that shows required domain(s)
+        if (ALLOWED_DOMAINS.length === 1) {
+          setEmailError(`Use an @${ALLOWED_DOMAINS[0]} email address.`);
+        } else {
+          setEmailError(
+            `Use one of: ${ALLOWED_DOMAINS.map((d) => "@" + d).join(", ")}`
+          );
+        }
+      } else {
+        setEmailError("");
+      }
     }
   }, [email, emailTouched]);
 
-  // Validate email function
-  const validateEmail = () => {
-    if (!email) {
-      setEmailError("Please enter your email address.");
-      return false;
-    } else if (!EMAIL_RE.test(email)) {
-      setEmailError("Please enter a valid email address.");
-      return false;
-    } else {
-      setEmailError("");
-      return true;
+  // Real-time full name validation
+  useEffect(() => {
+    if (fullNameTouched && isSignup) {
+      if (!fullName) {
+        setFullNameError("Please fill in this field");
+      } else if (fullName.trim().length < 2) {
+        setFullNameError("Please enter your full name.");
+      } else {
+        setFullNameError("");
+      }
     }
-  };
+  }, [fullName, fullNameTouched, isSignup]);
 
   // Animated height transitions
   const wrapperRef = useRef(null);
@@ -154,51 +180,96 @@ const LoginPage = () => {
   /* Form Validation */
   const validateStep1 = () => {
     let ok = true;
-    
-    // Validate full name
-    if (isSignup && fullName.trim().length < 2) {
-      setFullNameError("Please enter your full name.");
-      ok = false;
-    } else {
-      setFullNameError("");
+
+    // Validate full name (signup only)
+    if (isSignup) {
+      setFullNameTouched(true);
+      if (!fullName) {
+        setFullNameError("Please fill in this field");
+        ok = false;
+      } else if (fullName.trim().length < 2) {
+        setFullNameError("Please enter your full name.");
+        ok = false;
+      }
     }
-    
-    // Validate email
-    if (!validateEmail()) {
+
+    // Validate email and domain
+    setEmailTouched(true);
+    if (!email) {
+      setEmailError("Please fill in this field");
+      ok = false;
+    } else if (!EMAIL_RE.test(email)) {
+      setEmailError("Enter a valid email address.");
+      ok = false;
+    } else if (!isDomainAllowed(email)) {
+      if (ALLOWED_DOMAINS.length === 1) {
+        setEmailError(`Use an @${ALLOWED_DOMAINS[0]} email address.`);
+      } else {
+        setEmailError(
+          `Use one of: ${ALLOWED_DOMAINS.map((d) => "@" + d).join(", ")}`
+        );
+      }
       ok = false;
     }
-    
-    // Validate password
+
+    // Validate password (signup: medium+)
     const { score } = passwordStrength(password);
     if (isSignup && score < 2) {
       toast.error("Choose a stronger password (min: medium).");
       ok = false;
     }
-    
+
     return ok;
   };
 
   const validateBeforeSend = () => {
-    // Validate email
-    if (!validateEmail()) {
-      return false;
+    let ok = true;
+    setEmailTouched(true);
+
+    if (!email) {
+      setEmailError("Please fill in this field");
+      ok = false;
+    } else if (!EMAIL_RE.test(email)) {
+      setEmailError("Enter a valid email address.");
+      ok = false;
+    } else if (!isDomainAllowed(email)) {
+      if (ALLOWED_DOMAINS.length === 1) {
+        setEmailError(`Use an @${ALLOWED_DOMAINS[0]} email address.`);
+      } else {
+        setEmailError(
+          `Use one of: ${ALLOWED_DOMAINS.map((d) => "@" + d).join(", ")}`
+        );
+      }
+      ok = false;
     }
-    
+
     if (!password) {
       toast.error("Enter your password.");
-      return false;
+      ok = false;
     }
-    
-    return true;
+
+    // if signing up, check fullName & bio
+    if (isSignup) {
+      if (!fullName || fullName.trim().length < 2) {
+        setFullNameTouched(true);
+        setFullNameError("Please enter your full name.");
+        ok = false;
+      }
+      if (!bio || bio.trim().length === 0) {
+        toast.error("Please add a short bio.");
+        ok = false;
+      }
+    }
+
+    return ok;
   };
 
   /* Submit Handler */
   const onSubmitHandler = async (e) => {
+    // We added noValidate on the form; the browser won't block this submit event.
     e.preventDefault();
-    
-    // Mark email as touched to show validation errors
-    setEmailTouched(true);
 
+    // First step for signup: validate locally then move to step 2
     if (isSignup && !isDataSubmitted) {
       const ok = validateStep1();
       if (!ok) {
@@ -213,6 +284,7 @@ const LoginPage = () => {
       return;
     }
 
+    // Final submit (signup step 2 or login)
     if (!validateBeforeSend()) return;
 
     setIsSubmitting(true);
@@ -308,6 +380,7 @@ const LoginPage = () => {
           <form
             onSubmit={onSubmitHandler}
             autoComplete="on"
+            noValidate
             method="post"
             aria-label={isSignup ? "Sign up form" : "Login form"}
             className="relative w-full max-w-md p-4 sm:p-6 md:p-8 rounded-2xl bg-[linear-gradient(135deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] border border-white/10 backdrop-blur-xl shadow-2xl"
@@ -316,7 +389,7 @@ const LoginPage = () => {
             {/* Form Header */}
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h3 className="text-lg sm:text-xl font-semibold text-white">
+                <h3 className="text-lg sm:text-2xl font-semibold text-white">
                   {currState}
                 </h3>
                 <p className="text-xs text-white/60 mt-1">
@@ -385,15 +458,11 @@ const LoginPage = () => {
                         if (e.target.value.trim().length >= 2)
                           setFullNameError("");
                       }}
-                      onBlur={() => {
-                        if (isSignup && fullName.trim().length < 2) {
-                          setFullNameError("Please enter your full name.");
-                        }
-                      }}
+                      onBlur={() => setFullNameTouched(true)}
                       type="text"
                       autoComplete="name"
                       placeholder="Your full name"
-                      required={isSignup}
+                      aria-required={isSignup}
                       className="mt-2 w-full p-3 rounded-xl bg-white/5 placeholder-white/40 border border-white/10 text-white outline-none focus:ring-2 focus:ring-indigo-400/30 transition"
                       aria-invalid={!!fullNameError}
                     />
@@ -419,16 +488,31 @@ const LoginPage = () => {
                     value={email}
                     onChange={(e) => {
                       setEmail(e.target.value);
+                      // realtime clear if becomes valid domain+format
+                      if (EMAIL_RE.test(e.target.value) && isDomainAllowed(e.target.value)) {
+                        setEmailError("");
+                      } else {
+                        // keep errors until user blurs or corrects
+                        if (emailTouched) {
+                          if (!EMAIL_RE.test(e.target.value)) {
+                            setEmailError("Enter a valid email address.");
+                          } else if (!isDomainAllowed(e.target.value)) {
+                            if (ALLOWED_DOMAINS.length === 1) {
+                              setEmailError(`Use an @${ALLOWED_DOMAINS[0]} email address.`);
+                            } else {
+                              setEmailError(
+                                `Use one of: ${ALLOWED_DOMAINS.map((d) => "@" + d).join(", ")}`
+                              );
+                            }
+                          }
+                        }
+                      }
                     }}
-                    onBlur={() => {
-                      setEmailTouched(true);
-                      validateEmail();
-                    }}
-                    onFocus={() => setEmailTouched(true)}
+                    onBlur={() => setEmailTouched(true)}
                     type="email"
                     autoComplete="email"
                     placeholder="you@example.com"
-                    required
+                    aria-required={true}
                     className="mt-2 w-full p-3 rounded-xl bg-white/5 placeholder-white/40 border border-white/10 text-white outline-none focus:ring-2 focus:ring-indigo-400/30 transition"
                     aria-invalid={!!emailError}
                     aria-describedby={emailError ? "email-error" : undefined}
@@ -463,7 +547,7 @@ const LoginPage = () => {
                     type="password"
                     autoComplete={isSignup ? "new-password" : "current-password"}
                     placeholder="••••••••"
-                    required
+                    aria-required={true}
                     className="mt-2 w-full p-3 rounded-xl bg-white/5 placeholder-white/40 border border-white/10 text-white outline-none focus:ring-2 focus:ring-indigo-400/30 transition"
                     aria-describedby="password-hint"
                   />
@@ -523,7 +607,7 @@ const LoginPage = () => {
                     onChange={(e) => setBio(e.target.value)}
                     rows={4}
                     placeholder="Tell us a little about yourself..."
-                    required={isSignup}
+                    aria-required={isSignup}
                     className="mt-2 w-full p-3 rounded-xl bg-white/5 placeholder-white/40 border border-white/10 text-white outline-none focus:ring-2 focus:ring-indigo-400/30 transition resize-none"
                   />
                 </div>
@@ -601,6 +685,7 @@ const LoginPage = () => {
                       setEmailError("");
                       setFullNameError("");
                       setEmailTouched(false);
+                      setFullNameTouched(false);
                     }}
                     className="ml-2 font-medium text-indigo-300 hover:text-indigo-200 cursor-pointer"
                   >
@@ -615,9 +700,8 @@ const LoginPage = () => {
                     onClick={() => {
                       setCurrState("Sign up");
                       setIsDataSubmitted(false);
-                      setEmailError("");
-                      setFullNameError("");
                       setEmailTouched(false);
+                      setFullNameTouched(false);
                     }}
                     className="ml-2 font-medium text-indigo-300 hover:text-indigo-200 cursor-pointer"
                   >
