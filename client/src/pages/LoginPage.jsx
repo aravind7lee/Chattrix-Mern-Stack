@@ -10,8 +10,8 @@ import assets from "../assets/assets";
 import { AuthContext } from "../../context/AuthContext";
 import toast from "react-hot-toast";
 
-/* Email regex validation */
-const EMAIL_RE = /^\S+@\S+\.\S+$/;
+/* Improved Email regex validation */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /* Password strength logic */
 function passwordStrength(password) {
@@ -85,6 +85,9 @@ const LoginPage = () => {
   const [emailError, setEmailError] = useState("");
   const [fullNameError, setFullNameError] = useState("");
 
+  // Track if email field has been interacted with
+  const [emailTouched, setEmailTouched] = useState(false);
+
   // Responsive check
   const [isDesktop, setIsDesktop] = useState(
     typeof window !== "undefined"
@@ -99,6 +102,27 @@ const LoginPage = () => {
     onResize();
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  // Validate email when it changes and has been touched
+  useEffect(() => {
+    if (emailTouched) {
+      validateEmail();
+    }
+  }, [email, emailTouched]);
+
+  // Validate email function
+  const validateEmail = () => {
+    if (!email) {
+      setEmailError("Please enter your email address.");
+      return false;
+    } else if (!EMAIL_RE.test(email)) {
+      setEmailError("Please enter a valid email address.");
+      return false;
+    } else {
+      setEmailError("");
+      return true;
+    }
+  };
 
   // Animated height transitions
   const wrapperRef = useRef(null);
@@ -130,40 +154,50 @@ const LoginPage = () => {
   /* Form Validation */
   const validateStep1 = () => {
     let ok = true;
-    setEmailError("");
-    setFullNameError("");
+    
+    // Validate full name
     if (isSignup && fullName.trim().length < 2) {
       setFullNameError("Please enter your full name.");
       ok = false;
+    } else {
+      setFullNameError("");
     }
-    if (!EMAIL_RE.test(email)) {
-      setEmailError("Enter a valid email address.");
+    
+    // Validate email
+    if (!validateEmail()) {
       ok = false;
     }
+    
+    // Validate password
     const { score } = passwordStrength(password);
     if (isSignup && score < 2) {
       toast.error("Choose a stronger password (min: medium).");
       ok = false;
     }
+    
     return ok;
   };
 
   const validateBeforeSend = () => {
-    setEmailError("");
-    if (!EMAIL_RE.test(email)) {
-      setEmailError("Enter a valid email address.");
+    // Validate email
+    if (!validateEmail()) {
       return false;
     }
+    
     if (!password) {
       toast.error("Enter your password.");
       return false;
     }
+    
     return true;
   };
 
   /* Submit Handler */
   const onSubmitHandler = async (e) => {
     e.preventDefault();
+    
+    // Mark email as touched to show validation errors
+    setEmailTouched(true);
 
     if (isSignup && !isDataSubmitted) {
       const ok = validateStep1();
@@ -282,7 +316,7 @@ const LoginPage = () => {
             {/* Form Header */}
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h3 className="text-lg sm:text-2xl font-semibold text-white">
+                <h3 className="text-lg sm:text-xl font-semibold text-white">
                   {currState}
                 </h3>
                 <p className="text-xs text-white/60 mt-1">
@@ -351,6 +385,11 @@ const LoginPage = () => {
                         if (e.target.value.trim().length >= 2)
                           setFullNameError("");
                       }}
+                      onBlur={() => {
+                        if (isSignup && fullName.trim().length < 2) {
+                          setFullNameError("Please enter your full name.");
+                        }
+                      }}
                       type="text"
                       autoComplete="name"
                       placeholder="Your full name"
@@ -380,8 +419,12 @@ const LoginPage = () => {
                     value={email}
                     onChange={(e) => {
                       setEmail(e.target.value);
-                      if (EMAIL_RE.test(e.target.value)) setEmailError("");
                     }}
+                    onBlur={() => {
+                      setEmailTouched(true);
+                      validateEmail();
+                    }}
+                    onFocus={() => setEmailTouched(true)}
                     type="email"
                     autoComplete="email"
                     placeholder="you@example.com"
@@ -557,8 +600,9 @@ const LoginPage = () => {
                       setIsDataSubmitted(false);
                       setEmailError("");
                       setFullNameError("");
+                      setEmailTouched(false);
                     }}
-                    className="ml-2 font-medium text-indigo-300 hover:text-indigo-200"
+                    className="ml-2 font-medium text-indigo-300 hover:text-indigo-200 cursor-pointer"
                   >
                     Login here
                   </button>
@@ -571,8 +615,11 @@ const LoginPage = () => {
                     onClick={() => {
                       setCurrState("Sign up");
                       setIsDataSubmitted(false);
+                      setEmailError("");
+                      setFullNameError("");
+                      setEmailTouched(false);
                     }}
-                    className="ml-2 font-medium text-indigo-300 hover:text-indigo-200"
+                    className="ml-2 font-medium text-indigo-300 hover:text-indigo-200 cursor-pointer"
                   >
                     Create an account
                   </button>
